@@ -10,6 +10,8 @@ _ = gettext.gettext
 from .const import DB_ROOT
 from . import comments
 
+DB_ENV_PREFIX='jl_sql_exp_DB_'
+
 DB_CFG=DB_ROOT+'db_conf.json'
 
 DB_MYSQL = '1'
@@ -30,8 +32,9 @@ def open_dbfile(dbfile):
 def _getDBlist()->list:
     dbs=[]
     for e in os.environ:
-        if e[0:3]=='DB_':
-            dbs.append(e[3:])
+        #if e[0:3]=='DB_':
+        if len(e)>len(DB_ENV_PREFIX):
+            if e[0:len(DB_ENV_PREFIX)]==DB_ENV_PREFIX: dbs.append(e[3:])
     return dbs
 
 def getDBlist()->list:
@@ -67,10 +70,11 @@ def _getCfgEntry(name, passfile=DB_CFG):
     return None
 
 def _getDbInfo(name: str)-> 'dict | None':
-    var_name='DB_' + name
+    #var_name='DB_' + name
+    var_name=DB_ENV_PREFIX + name
     db_str=os.getenv(var_name)
 
-    if db_str is not None:
+    if db_str is not None:        
         return json.loads(base64.b64decode(db_str.encode()))
 
     return _getCfgEntry(name)
@@ -84,6 +88,15 @@ def getDbInfo(name: str)-> 'dict | None':
     return i
 
 def _getSQL_engine(dbid, db, usedb=None):
+
+    #  Replace host/port/name/user/pass if given as environment variables
+    for kk in ["db_host","db_name","db_user","db_pass","db_port"]:
+        if kk in db:
+            if db[kk][0:5]=='$ENV{': 
+                vv = db[kk].lstrip('$ENV{').rstrip('}')
+                if vv not in os.environ:
+                    raise Exception("DB connection expecting environment variable "+vv)
+                db[kk]=os.environ[vv]
 
     db_host = db['db_host'] if 'db_host' in db else ''
     db_name = db['db_name'] if 'db_name' in db else ''
